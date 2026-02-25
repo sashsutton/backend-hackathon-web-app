@@ -2,6 +2,7 @@ import os
 from clerk_backend_api import Clerk
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from config.db import mongodb_connection, check_mongodb_connection
 from services.clerk_auth import ClerkAuthService
 
@@ -12,6 +13,12 @@ load_dotenv("key.env")
 
 app = Flask(__name__)
 
+# Configure CORS to allow credentials (cookies) from frontend
+CORS(app, supports_credentials=True, resources={
+    r"/auth/*": {
+        "origins": os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    }
+})
 
 clerk_auth_service = ClerkAuthService()
 app.register_blueprint(auth_bp)

@@ -19,16 +19,9 @@ class ClerkAuthService:
         self.secret_key = os.getenv("CLERK_SECRET_KEY")
         if not self.secret_key:
             raise ValueError("CLERK_SECRET_KEY environment variable not set")
-    def is_signed_in(self, request_param: httpx.Request):
-        
-        sdk = Clerk(bearer_auth=self.secret_key)
-        
-        request_state = sdk.authenticate_request(
-            request_param,
-            AuthenticateRequestOptions()
-        )
-        
-        return request_state
+
+
+
     def get_clerk_client(self):
         return Clerk(bearer_auth=self.secret_key)
     
