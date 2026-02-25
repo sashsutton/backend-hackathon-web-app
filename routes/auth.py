@@ -2,10 +2,10 @@
 
 from flask import Blueprint, request, jsonify
 from services.clerk_auth import ClerkAuthService
-from models import UserCreate, UserResponse
 from datetime import datetime
 from config.db import mongodb_connection
 from pymongo.errors import PyMongoError
+from models.user import UserBase, UserUpdate
 
 
 auth_bp = Blueprint('auth', __name__)
