@@ -46,6 +46,7 @@ def store_user_in_database(clerk_id: str, email: str, first_name: str = "", last
 def signup():
     try:
         data = request.get_json()
+        UserBase(data['email'], data['password'])
 
         required_fields = ['email', 'password']
         for field in required_fields:

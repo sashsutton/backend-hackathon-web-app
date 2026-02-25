@@ -14,8 +14,6 @@ app = Flask(__name__)
 
 
 clerk_auth_service = ClerkAuthService()
-
-
 app.register_blueprint(auth_bp)
 
 @app.route('/')
