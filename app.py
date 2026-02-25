@@ -5,12 +5,22 @@ from flask import Flask, request, jsonify
 from config.db import mongodb_connection, check_mongodb_connection
 from services.clerk_auth import ClerkAuthService
 
+# Import blueprints
+from routes.auth import auth_bp
+from routes.users import users_bp
+from routes.quizzes import quizzes_bp
+
 load_dotenv("key.env")
 
 app = Flask(__name__)
 
 # Initialize services
 clerk_auth_service = ClerkAuthService()
+
+# Register blueprints
+app.register_blueprint(auth_bp)
+app.register_blueprint(users_bp)
+app.register_blueprint(quizzes_bp)
 
 @app.route('/')
 def hello_world():
@@ -28,14 +38,6 @@ def test_clerk():
         
         except Exception as e:
             return f"Erreur de connexion : {str(e)}"
-
-@app.route('/health-check')
-def health_check():
-    success, message = check_mongodb_connection()
-    if success:
-        return jsonify({"status": "healthy", "message": message}), 200
-    else:
-        return jsonify({"status": "unhealthy", "error": message}), 500
 
 @app.route('/check-mongodb')
 def check_mongodb():
