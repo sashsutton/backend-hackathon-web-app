@@ -56,7 +56,7 @@ def signup():
                 }), 400
 
         
-        #  On utilise la fonction crée (dans services) pour crée un utilisateur sur clerk
+        #  On utilise la fonction create_user (clerk_auth.py dans services) pour crée un utilisateur sur clerk
         success, result = clerk_auth_service.create_user(
             email=data['email'],
             password=data['password'],

@@ -18,7 +18,7 @@ class ClerkAuthService:
     
     def authenticate_user(self, email: str, password: str) -> tuple:
         try:
-            with self.get_clerk_client() as sdk:
+            with Clerk(bearer_auth=self.secret_key) as sdk:
 
                 users = sdk.users.list()
 
@@ -49,7 +49,7 @@ class ClerkAuthService:
     def get_user_by_id(self, user_id: str) -> tuple:
 
         try:
-            with self.get_clerk_client() as sdk:
+            with Clerk(bearer_auth=self.secret_key)  as sdk:
                 user = sdk.users.get(user_id)
                 return True, {
                     "user_id": user.id,
@@ -64,7 +64,7 @@ class ClerkAuthService:
     def list_all_users(self) -> tuple:
 
         try:
-            with self.get_clerk_client() as sdk:
+            with Clerk(bearer_auth=self.secret_key) as sdk:
                 users = sdk.users.list()
                 user_list = []
                 for user in users:
@@ -82,7 +82,7 @@ class ClerkAuthService:
     def create_user(self, email: str, password: str, first_name: str = "", last_name: str = "") -> tuple:
 
         try:
-            with self.get_clerk_client() as sdk:
+            with Clerk(bearer_auth=self.secret_key) as sdk:
                 new_user = sdk.users.create(
                     email_address=[email],
                     password=password,
@@ -97,3 +97,4 @@ class ClerkAuthService:
                 }
         except Exception as e:
             return False, f"Failed to create user: {str(e)}"
+
