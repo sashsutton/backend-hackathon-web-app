@@ -1,5 +1,6 @@
 
 
+import os
 from flask import Blueprint, request, jsonify
 from services.clerk_auth import ClerkAuthService
 from datetime import datetime
@@ -20,8 +21,7 @@ def store_user_in_database(clerk_id: str, email: str, first_name: str = "", last
         users_collection = db["users"]
 
         name = f"{first_name} {last_name}".strip()
-        if not name:
-            name = email.split('@')[0]
+
             
         user_data = {
             "clerk_id": clerk_id,
@@ -37,9 +37,11 @@ def store_user_in_database(clerk_id: str, email: str, first_name: str = "", last
         
     except PyMongoError as e:
         print(f"Database error: {str(e)}")
+        print(f"MongoDB URI: {os.getenv('MONGODB_URI', 'Not set')}")
         return False
     except Exception as e:
         print(f"Unexpected error storing user: {str(e)}")
+        print(f"MongoDB URI: {os.getenv('MONGODB_URI', 'Not set')}")
         return False
 
 @auth_bp.route('/auth/signup', methods=['POST'])
@@ -55,7 +57,11 @@ def signup():
                     "error": f"Missing required field: {field}"
                 }), 400
 
-        
+        #TODO
+        #logique pour verifier si un utilisateur s'est deja inscrit
+        #findBy("email")
+
+
         #  On utilise la fonction create_user (clerk_auth.py dans services) pour crée un utilisateur sur clerk
         success, result = clerk_auth_service.create_user(
             email=data['email'],
