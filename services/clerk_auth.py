@@ -2,7 +2,14 @@
 import os
 from clerk_backend_api import Clerk
 from dotenv import load_dotenv
-
+import os
+from functools import wraps
+from flask import request, jsonify
+from clerk_backend_api import Clerk
+from clerk_backend_api.security.types import AuthenticateRequestOptions
+from config.db import mongodb_connection
+import httpx
+from clerk_backend_api.security.types import AuthenticateRequestOptions
 load_dotenv("key.env")
 
 class ClerkAuthService:
@@ -12,7 +19,16 @@ class ClerkAuthService:
         self.secret_key = os.getenv("CLERK_SECRET_KEY")
         if not self.secret_key:
             raise ValueError("CLERK_SECRET_KEY environment variable not set")
-    
+    def is_signed_in(self, request_param: httpx.Request):
+        
+        sdk = Clerk(bearer_auth=self.secret_key)
+        
+        request_state = sdk.authenticate_request(
+            request_param,
+            AuthenticateRequestOptions()
+        )
+        
+        return request_state
     def get_clerk_client(self):
         return Clerk(bearer_auth=self.secret_key)
     
