@@ -46,7 +46,6 @@ def store_user_in_database(clerk_id: str, email: str, first_name: str = "", last
 def signup():
     try:
         data = request.get_json()
-        UserBase(data['email'], data['password'])
 
         required_fields = ['email', 'password']
         for field in required_fields:
@@ -77,8 +76,11 @@ def signup():
         first_name = result.get('first_name', '')
         last_name = result.get('last_name', '')
 
+
         promotion = data.get('promotion', 'licence')
         mention = data.get('mention', 'informatique')
+
+        UserBase(clerk_id=clerk_id, email=email, first_name=first_name, last_name=last_name, promotion=promotion, mention=mention)
 
 
         #On utilise la fonction qui nous permet de sauvegarder l'utilisateur dans la base de donnée
