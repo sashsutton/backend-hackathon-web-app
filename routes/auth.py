@@ -42,8 +42,8 @@ def store_user_in_database(clerk_id: str, email: str, first_name: str = "", last
         print(f"Unexpected error storing user: {str(e)}")
         return False
 
-@auth_bp.route('/auth/register', methods=['POST'])
-def register():
+@auth_bp.route('/auth/signup', methods=['POST'])
+def signup():
     try:
         data = request.get_json()
 

@@ -7,20 +7,16 @@ from services.clerk_auth import ClerkAuthService
 
 # Import blueprints
 from routes.auth import auth_bp
-from routes.users import users_bp
-from routes.quizzes import quizzes_bp
 
 load_dotenv("key.env")
 
 app = Flask(__name__)
 
-# Initialize services
+
 clerk_auth_service = ClerkAuthService()
 
-# Register blueprints
+
 app.register_blueprint(auth_bp)
-app.register_blueprint(users_bp)
-app.register_blueprint(quizzes_bp)
 
 @app.route('/')
 def hello_world():
