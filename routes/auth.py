@@ -57,10 +57,7 @@ def signup():
                     "error": f"Missing required field: {field}"
                 }), 400
 
-        #TODO
-        #logique pour verifier si un utilisateur s'est deja inscrit
-        #findBy("email")
-
+        
 
         #  On utilise la fonction create_user (clerk_auth.py dans services) pour crée un utilisateur sur clerk
         success, result = clerk_auth_service.create_user(
