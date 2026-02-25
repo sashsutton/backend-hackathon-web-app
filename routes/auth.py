@@ -56,7 +56,7 @@ def signup():
                 }), 400
 
         
-        # Create user in Clerk
+        #  On utilise la fonction crée (dans services) pour crée un utilisateur sur clerk
         success, result = clerk_auth_service.create_user(
             email=data['email'],
             password=data['password'],
@@ -78,7 +78,9 @@ def signup():
 
         promotion = data.get('promotion', 'licence')
         mention = data.get('mention', 'informatique')
-        
+
+
+        #On utilise la fonction qui nous permet de sauvegarder l'utilisateur dans la base de donnée
         db_success = store_user_in_database(
             clerk_id=clerk_id,
             email=email,
@@ -152,60 +154,4 @@ def logout():
         return jsonify({
             "success": False,
             "error": f"Logout failed: {str(e)}"
-        }), 500
-
-@auth_bp.route('/auth/me', methods=['GET'])
-def get_current_user():
-
-    try:
-
-        user_id = request.args.get('user_id')
-        
-        if not user_id:
-            return jsonify({
-                "success": False,
-                "error": "User ID is required"
-            }), 400
-
-        success, result = clerk_auth_service.get_user_by_id(user_id)
-        
-        if not success:
-            return jsonify({
-                "success": False,
-                "error": result
-            }), 404
-        
-        return jsonify({
-            "success": True,
-            "user": result
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to get user: {str(e)}"
-        }), 500
-
-@auth_bp.route('/auth/users', methods=['GET'])
-def list_users():
-
-    try:
-
-        success, result = clerk_auth_service.list_all_users()
-
-        if not success:
-            return jsonify({
-                "success": False,
-                "error": result
-            }), 500
-
-        return jsonify({
-            "success": True,
-            "users": result
-        }), 200
-
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to list users: {str(e)}"
         }), 500
