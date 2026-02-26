@@ -216,7 +216,7 @@ def create_quiz():
             
             current_user = get_current_user()
             if current_user:
-                clerk_id = current_user.get('id') or quiz_result.clerk_id
+                clerk_id = current_user.get('clerk_id') or quiz_result.clerk_id
             else:
                 clerk_id = quiz_result.clerk_id
             quiz_id = quiz_result.quiz_id
@@ -232,7 +232,7 @@ def create_quiz():
             return jsonify({
                 "success": True, 
                 "score": quiz_result_with_score.score, 
-                "details": quiz_result_with_score.answers,
+                "details": [a.model_dump() if hasattr(a, 'model_dump') else a for a in quiz_result_with_score.answers],
                 "result_id": result_id
             }), 200
             
@@ -246,4 +246,80 @@ def create_quiz():
         return jsonify({
             "success": False,
             "error": f"Failed to process quiz: {str(e)}"
+        }), 500
+
+@quiz_bp.route('/quiz/soloquiz/<quiz_id>', methods=['POST', 'GET'])
+@clerk_auth_middleware
+def start_solo_quiz(quiz_id):
+    try:
+        current_user = get_current_user()
+        clerk_id = current_user.get('clerk_id')
+
+        mongo_client = mongodb_connection()
+        db = mongo_client.get_database("hackathon_db")
+        quiz_service = QuizService(db)
+
+        session_id = quiz_service.create_solo_session(quiz_id, clerk_id)
+
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "message": "Solo session created successfully"
+        }), 201
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Failed to create solo session: {str(e)}"
+        }), 500
+
+@quiz_bp.route('/quiz/submit-solo', methods=['POST'])
+@clerk_auth_middleware
+def submit_solo_quiz():
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id')
+        quiz_id = data.get('quiz_id')
+        answers = data.get('answers', [])
+
+        mongo_client = mongodb_connection()
+        db = mongo_client.get_database("hackathon_db")
+        quiz_service = QuizService(db)
+
+        current_user = get_current_user()
+        clerk_id = current_user.get('clerk_id')
+
+        # The frontend will not know is_correct yet, so if missing/ignored, it recalculates
+        # However, UserAnswerModel requires is_correct. The frontend should just pass a default like false.
+        user_answers = [UserAnswerModel(**ans) for ans in answers]
+
+        quiz_result_with_score = quiz_service.calculate_quiz_score(quiz_id, user_answers)
+        quiz_result_with_score.clerk_id = clerk_id
+
+        result_id = quiz_service.save_quiz_result(quiz_result_with_score)
+
+        if session_id:
+            from bson import ObjectId
+            db.solo_sessions.update_one(
+                {"_id": ObjectId(session_id)},
+                {"$set": {"status": "finished", "score": quiz_result_with_score.score}}
+            )
+
+        return jsonify({
+            "success": True, 
+            "score": quiz_result_with_score.score, 
+            "details": [a.model_dump() if hasattr(a, 'model_dump') else a for a in quiz_result_with_score.answers],
+            "result_id": result_id
+        }), 200
+
+    except ValidationError as e:
+        return jsonify({
+            "success": False,
+            "error": "Validation failed",
+            "details": e.errors()
+        }), 400
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Failed to submit solo quiz: {str(e)}"
         }), 500

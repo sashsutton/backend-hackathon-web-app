@@ -9,26 +9,44 @@ class QuizService:
         self.db = db
     
     def calculate_quiz_score(self, quiz_id: str, user_answers: List[UserAnswerModel]) -> QuizResult:
+        from bson import ObjectId
+        
+        original_quiz = None
+        try:
+            original_quiz = self.db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+        except Exception:
+            pass
 
+        if not original_quiz:
+            original_quiz = self.db.quizzes.find_one({"id": quiz_id})
 
-        original_quiz = self.db.quizzes.find_one({"id": quiz_id})
         if not original_quiz:
             raise ValueError("Quiz not found")
         
         total_score = 0
         detailed_answers = []
         
+        questions = original_quiz.get('questions', [])
+        print(f"[DEBUG] Quiz {quiz_id}: {len(questions)} questions found")
+        print(f"[DEBUG] User answers: {[(str(a.question_id), a.selected_option) for a in user_answers]}")
 
         for user_ans in user_answers:
-            question = next((q for q in original_quiz['questions'] if q['id'] == user_ans.question_id), None)
+            question = None
+            for idx, q in enumerate(questions):
+                q_id = str(q.get('id')) if q.get('id') is not None else str(idx)
+                if q_id == str(user_ans.question_id):
+                    question = q
+                    break
+            
+            print(f"[DEBUG] Answer for q_id={user_ans.question_id}: question_found={question is not None}, selected={user_ans.selected_option}")
             
             if question:
-                is_correct = (user_ans.selected_option == question['correct_answer'])
+                is_correct = (str(user_ans.selected_option) == str(question.get('correct_answer')))
                 if is_correct:
-                    total_score += question['points']
+                    total_score += int(question.get('points', 10))
                 
                 detailed_answers.append({
-                    "question_id": question['id'],
+                    "question_id": str(user_ans.question_id),
                     "selected_option": user_ans.selected_option,
                     "is_correct": is_correct
                 })
@@ -47,14 +65,28 @@ class QuizService:
         return str(insert_result.inserted_id)
     
     def get_quiz_by_id(self, quiz_id: str) -> Dict[str, Any]:
+        from bson import ObjectId
 
-        quiz_data = self.db.quizzes.find_one({"id": quiz_id}, {"_id": 0})
+        quiz_data = None
+        try:
+            quiz_data = self.db.quizzes.find_one({"_id": ObjectId(quiz_id)}, {"_id": 0})
+        except Exception:
+            pass
+
+        if not quiz_data:
+            quiz_data = self.db.quizzes.find_one({"id": quiz_id}, {"_id": 0})
+
         if not quiz_data:
             raise ValueError("Quiz not found")
         
-        # Remove correct answers from questions
-        for q in quiz_data['questions']:
-            del q['correct_answer']
+        # Remove correct answers and ensure each question has a stable string id (its index)
+        for idx, q in enumerate(quiz_data.get('questions', [])):
+            if 'correct_answer' in q:
+                del q['correct_answer']
+            # Always use index as id for consistent matching with calculate_quiz_score
+            if '_id' in q:
+                q.pop('_id')
+            q['id'] = str(idx)
         
         return quiz_data
     
@@ -104,3 +136,14 @@ class QuizService:
         if not question:
             raise ValueError("Question not found")
         return question
+
+    def create_solo_session(self, quiz_id: str, clerk_id: str) -> str:
+        from models.quiz_model import SoloGameSessionModel
+        
+        session = SoloGameSessionModel(
+            quiz_id=quiz_id,
+            clerk_id=clerk_id
+        )
+        session_dict = session.model_dump(exclude={'id'})
+        result = self.db.solo_sessions.insert_one(session_dict)
+        return str(result.inserted_id)

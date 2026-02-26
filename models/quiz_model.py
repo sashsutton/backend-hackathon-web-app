@@ -8,6 +8,18 @@ class DuelStatus(str, Enum):
     INBATTLE = "in_battle"
     FINISHED = "finished"
 
+class SoloSessionStatus(str, Enum):
+    IN_PROGRESS = "in_progress"
+    FINISHED = "finished"
+
+class SoloGameSessionModel(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    quiz_id: str
+    clerk_id: str
+    status: SoloSessionStatus = Field(default=SoloSessionStatus.IN_PROGRESS)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    score: Optional[int] = None
+
 class QuestionModel(BaseModel):
     id: Optional[int] = Field(None, description="ID (optionnel, auto-généré par MongoDB)")
     text: str = Field(..., description=" La question")
