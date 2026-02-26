@@ -1,233 +1,123 @@
-
-
 import os
 from flask import Blueprint, request, jsonify
 from services.clerk_auth import ClerkAuthService
-from datetime import datetime
+from middleware.clerk_auth import clerk_auth_middleware
+from models.user_model import UserBase, UserUpdate
 from config.db import mongodb_connection
-from pymongo.errors import PyMongoError
-from models.user import UserBase, UserUpdate
-import httpx
 
 auth_bp = Blueprint('auth', __name__)
 
 clerk_auth_service = ClerkAuthService()
 
-# def store_user_in_database(clerk_id: str, email: str, first_name: str = "", last_name: str = "", promotion: str = "licence", mention: str = "informatique") -> bool:
-#
-#     try:
-#         client = mongodb_connection()
-#         db = client.get_database("hackathon_db")
-#         users_collection = db["users"]
-#
-#         name = f"{first_name} {last_name}".strip()
-#
-#
-#         user_data = {
-#             "clerk_id": clerk_id,
-#             "name": name,
-#             "email": email,
-#             "promotion": promotion,
-#             "mention": mention,
-#             "created_at": datetime.utcnow()
-#         }
-#
-#         result = users_collection.insert_one(user_data)
-#         return result.inserted_id is not None
-#
-#     except PyMongoError as e:
-#         print(f"Database error: {str(e)}")
-#         print(f"MongoDB URI: {os.getenv('MONGODB_URI', 'Not set')}")
-#         return False
-#     except Exception as e:
-#         print(f"Unexpected error storing user: {str(e)}")
-#         print(f"MongoDB URI: {os.getenv('MONGODB_URI', 'Not set')}")
-#         return False
-#
-# @auth_bp.route('/auth/signup', methods=['POST'])
-# def signup():
-#     try:
-#         data = request.get_json()
-#
-#         required_fields = ['email', 'password']
-#         for field in required_fields:
-#             if field not in data:
-#                 return jsonify({
-#                     "success": False,
-#                     "error": f"Missing required field: {field}"
-#                 }), 400
-#
-#
-#
-#         #  On utilise la fonction create_user (clerk_auth.py dans services) pour crée un utilisateur sur clerk
-#         success, result = clerk_auth_service.create_user(
-#             email=data['email'],
-#             password=data['password'],
-#             first_name=data.get('first_name', ''),
-#             last_name=data.get('last_name', '')
-#         )
-#
-#         if not success:
-#             return jsonify({
-#                 "success": False,
-#                 "error": result
-#             }), 400
-#
-#
-#         clerk_id = result.get('user_id')
-#         email = result.get('email')
-#         first_name = result.get('first_name', '')
-#         last_name = result.get('last_name', '')
-#
-#
-#         promotion = data.get('promotion', 'licence')
-#         mention = data.get('mention', 'informatique')
-#
-#         UserBase(clerk_id=clerk_id, email=email, first_name=first_name, last_name=last_name, promotion=promotion, mention=mention)
-#
-#
-#         #On utilise la fonction qui nous permet de sauvegarder l'utilisateur dans la base de donnée
-#         db_success = store_user_in_database(
-#             clerk_id=clerk_id,
-#             email=email,
-#             first_name=first_name,
-#             last_name=last_name,
-#             promotion=promotion,
-#             mention=mention
-#         )
-#
-#         if not db_success:
-#             print(f"Warning: Failed to store user {clerk_id} in database")
-#
-#         return jsonify({
-#             "success": True,
-#             "message": "User registered successfully",
-#             "user": result,
-#             "database_stored": db_success
-#         }), 201
-#
-#     except Exception as e:
-#         return jsonify({
-#             "success": False,
-#             "error": f"Registration failed: {str(e)}"
-#         }), 500
-# <<<<<<< HEAD
-#
-#
-# =======
-# >>>>>>> d15abcb3ad0fff9dc217463381d8ce3be5a76272
-#
-# @auth_bp.route('/auth/me', methods=['GET'])
-# def get_my_info():
-#     """
-#     Get current authenticated user information.
-#     Uses Clerk's authenticate_request to verify the session.
-#     """
-#     try:
-# <<<<<<< HEAD
-#
-#         clerk_req = httpx.Request(
-# =======
-#         # Convert Flask request to httpx.Request for Clerk authentication
-#         my_clerk_request = httpx.Request(
-# >>>>>>> d15abcb3ad0fff9dc217463381d8ce3be5a76272
-#             method=request.method,
-#             url=request.url,
-#             headers=dict(request.headers),
-#             content=request.get_data()
-#         )
-#
-# <<<<<<< HEAD
-#         state = clerk_auth_service.verify_clerk_session(clerk_req)
-#
-#         if not state.is_signed_in:
-#             return jsonify({
-#                 "success": False,
-#                 "error": "Non connecté",
-#                 "reason": str(state.reason)
-#             }), 401
-#
-#         user_info = state.payload
-#
-#         return jsonify({
-#             "success": True,
-#             "message": "Infos récupérées du Payload",
-#             "user_id": user_info.get("sub"),
-#             "details_du_front": user_info
-# =======
-#         # Authenticate the request using Clerk's backend SDK
-#         request_state = clerk_auth_service.is_signed_in(my_clerk_request)
-#
-#         # Check if user is signed in
-#         if not request_state.is_signed_in:
-#             return jsonify({
-#                 "success": False,
-#                 "error": "Invalid session",
-#                 "reason": request_state.reason
-#             }), 401
-#
-#         # Return user information from the authenticated payload
-#         return jsonify({
-#             "success": True,
-#             "clerk_id": request_state.payload.get("sub"),
-#             "email": request_state.payload.get("email", ""),
-#             "first_name": request_state.payload.get("first_name", ""),
-#             "last_name": request_state.payload.get("last_name", ""),
-#             "full_payload": request_state.payload
-# >>>>>>> d15abcb3ad0fff9dc217463381d8ce3be5a76272
-#         }), 200
-#
-#     except Exception as e:
-#         return jsonify({
-#             "success": False,
-#             "error": f"Authentication check failed: {str(e)}"
-#         }), 500
-# @auth_bp.route('/auth/login', methods=['POST'])
-# def login():
-#
-#     try:
-#         data = request.get_json()
-#
-#         if not data or 'email' not in data or 'password' not in data:
-#             return jsonify({
-#                 "success": False,
-#                 "error": "Email and password are required"
-#             }), 400
-#
-#         success, result = clerk_auth_service.authenticate_user(
-#             data['email'],
-#             data['password']
-#         )
-#
-#         if not success:
-#             return jsonify({
-#                 "success": False,
-#                 "error": result
-#             }), 401
-#
-#         return jsonify({
-#             "success": True,
-#             "message": "Login successful",
-#             "user": result
-#         }), 200
-#
-#     except Exception as e:
-#         return jsonify({
-#             "success": False,
-#             "error": f"Login failed: {str(e)}"
-#         }), 500
-#
-# @auth_bp.route('/auth/logout', methods=['POST'])
-# def logout():
-#
-#     try:
-#         return jsonify({
-#             "success": True,
-#             "message": "Logout successful"
-#         }), 200
-#
-#     except Exception as e:
-#         return jsonify({
-#             "success": False,
-#             "error": f"Logout failed: {str(e)}"
-#         }), 500
+
+@auth_bp.route('/auth/me', methods=['GET'])
+@clerk_auth_middleware
+def get_my_info():
+    """
+    Get current authenticated user information from MongoDB.
+    The middleware validates the Clerk session and populates request.clerk_user_id.
+    MongoDB is the source of truth — it already holds first_name, last_name, email
+    (synced from Clerk on first login) plus all game-specific fields.
+    """
+    try:
+        clerk_id = request.clerk_user_id
+        db = mongodb_connection().get_database("hackathon_db")
+        user = db["users"].find_one({"clerk_id": clerk_id})
+
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": "User not found in database"
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "clerk_id": user.get("clerk_id"),
+            "email": user.get("email", ""),
+            "first_name": user.get("first_name", ""),
+            "last_name": user.get("last_name", ""),
+            "promotion": user.get("promotion", ""),
+            "mention": user.get("mention", ""),
+            "elo": user.get("elo", 1200),
+            "wins": user.get("wins", 0),
+            "losses": user.get("losses", 0),
+            "total_duels": user.get("total_duels", 0)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Failed to get user information: {str(e)}"
+        }), 500
+
+
+@auth_bp.route('/auth/profile', methods=['PUT'])
+@clerk_auth_middleware
+def update_profile():
+    """
+    Update current authenticated user's profile information.
+    Uses Clerk middleware to verify the session.
+    """
+    try:
+        # Get the current user from the middleware
+        current_user = request.clerk_user
+
+
+        update_data = request.get_json()
+
+
+        from models.user_model import UserUpdate
+        validated_update = UserUpdate(**update_data)
+
+
+        update_fields = {}
+        if validated_update.name:
+            # Split name into first and last name
+            name_parts = validated_update.name.split(' ', 1)
+            update_fields['first_name'] = name_parts[0]
+            if len(name_parts) > 1:
+                update_fields['last_name'] = name_parts[1]
+        if validated_update.promotion:
+            update_fields['promotion'] = validated_update.promotion
+        if validated_update.mention:
+            update_fields['mention'] = validated_update.mention
+        if validated_update.email:
+            update_fields['email'] = validated_update.email
+
+        # Update the user in MongoDB
+        db = mongodb_connection().get_database("hackathon_db")
+        result = db["users"].update_one(
+            {"clerk_id": current_user.get("clerk_id")},
+            {"$set": update_fields}
+        )
+
+        if result.modified_count == 0:
+            return jsonify({
+                "success": False,
+                "error": "No changes made or user not found"
+            }), 404
+
+
+        updated_user = db["users"].find_one({"clerk_id": current_user.get("clerk_id")})
+
+        return jsonify({
+            "success": True,
+            "user": {
+                "clerk_id": updated_user.get("clerk_id"),
+                "email": updated_user.get("email", ""),
+                "first_name": updated_user.get("first_name", ""),
+                "last_name": updated_user.get("last_name", ""),
+                "promotion": updated_user.get("promotion", ""),
+                "mention": updated_user.get("mention", ""),
+                "elo": updated_user.get("elo", 1200),
+                "wins": updated_user.get("wins", 0),
+                "losses": updated_user.get("losses", 0),
+                "total_duels": updated_user.get("total_duels", 0)
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Failed to update profile: {str(e)}"
+        }), 500

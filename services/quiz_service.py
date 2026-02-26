@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from models.quiz_models import UserAnswerModel, QuizResult, QuestionModel, QuizModel
+from models.quiz_model import UserAnswerModel, QuizResult, QuestionModel, QuizModel
 from pymongo.database import Database
 from bson import ObjectId
 from pydantic import ValidationError
@@ -86,27 +86,25 @@ class QuizService:
             raise ValueError(f"Question validation failed: {e.errors()}")
     
     def create_quiz(self, quiz_data: Dict[str, Any]) -> str:
-
         try:
-
-            validated_quiz = QuizModel(**quiz_data)
-            quiz_dict = validated_quiz.model_dump()
-            
+            # Nettoyage : supprimer id si None pour laisser MongoDB générer _id
+            quiz_dict = {k: v for k, v in quiz_data.items() if k != 'id' or v is not None}
 
             result = self.db.quizzes.insert_one(quiz_dict)
             return str(result.inserted_id)
-            
-        except ValidationError as e:
-            raise ValueError(f"Quiz validation failed: {e.errors()}")
+
+        except Exception as e:
+            raise ValueError(f"Quiz creation failed: {str(e)}")
     
     def get_all_questions(self) -> List[Dict[str, Any]]:
 
         questions = list(self.db.questions.find({}, {"_id": 0}))
         return questions
     
-    def get_question_by_id(self, question_id: int) -> Dict[str, Any]:
+    def get_question_by_id(self, question_id: str) -> Dict[str, Any]:
 
-        question = self.db.questions.find_one({"id": question_id}, {"_id": 0})
+        from bson import ObjectId
+        question = self.db.questions.find_one({"_id": ObjectId(question_id)}, {"_id": 0})
         if not question:
             raise ValueError("Question not found")
         return question

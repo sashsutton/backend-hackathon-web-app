@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from clerk_backend_api import Clerk
 from clerk_backend_api.security.types import AuthenticateRequestOptions
 from config.db import mongodb_connection
-from models.user import UserBase
+from models.user_model import UserBase
 
 load_dotenv("key.env")
 
@@ -21,6 +21,9 @@ clerk_client = Clerk(bearer_auth=clerk_secret_key)
 def clerk_auth_middleware(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        # Laisser passer les requêtes OPTIONS (preflight CORS) sans authentification
+        if request.method == "OPTIONS":
+            return f(*args, **kwargs)
 
         httpx_req = httpx.Request(
             method=request.method,
@@ -34,21 +37,23 @@ def clerk_auth_middleware(f):
             request_state = clerk_client.authenticate_request(
                 httpx_req,
                 AuthenticateRequestOptions(
-                    authorized_parties=[os.getenv("FRONTEND_URL", "http://localhost:3000")]
+                    authorized_parties=[
+                        os.getenv("FRONTEND_URL", "http://localhost:5173"),
+                        os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/") + "/"
+                    ]
                 )
             )
 
             if not request_state.is_signed_in:
-                return jsonify({"error": "Unauthorized", "reason": request_state.reason}), 401
-
+                return jsonify({"error": "Unauthorized", "reason": str(request_state.reason)}), 401
 
             clerk_user_id = request_state.payload.get("sub")
 
             if not clerk_user_id:
                 return jsonify({"error": "Invalid token payload"}), 401
 
-            mongo_client = mongodb_connection()
-            user = mongo_client.users.find_one({"clerk_id": clerk_user_id})
+            db = mongodb_connection().get_database("hackathon_db")
+            user = db["users"].find_one({"clerk_id": clerk_user_id})
 
             if not user:
                 print(f"New user detected! Fetching details for {clerk_user_id}")
@@ -68,7 +73,6 @@ def clerk_auth_middleware(f):
                     last_name = ""
                     email = ""
 
-
                 user_data = {
                     "clerk_id": clerk_user_id,
                     "first_name": first_name,
@@ -76,7 +80,7 @@ def clerk_auth_middleware(f):
                     "email": email,
                     "promotion": "Unknown",
                     "mention": "Unknown",
-                    "elo_rating": 1200,
+                    "elo": 1200,
                     "total_duels": 0,
                     "wins": 0,
                     "losses": 0
@@ -85,11 +89,7 @@ def clerk_auth_middleware(f):
                 try:
                     validated_user = UserBase(**user_data)
                     user_dict = validated_user.model_dump()
-                    
-
-                    user_dict["elo"] = user_dict.pop("elo_rating")
-                    
-                    mongo_client.users.insert_one(user_dict)
+                    db["users"].insert_one(user_dict)
                 except Exception as e:
                     print(f"Pydantic validation error: {e}")
 
@@ -103,19 +103,24 @@ def clerk_auth_middleware(f):
                         "wins": 0,
                         "losses": 0
                     }
-                    mongo_client.users.insert_one(user_dict)
+                    db["users"].insert_one(user_dict)
                 print(f"Successfully created DB profile for {first_name} {last_name}")
 
+                user = db["users"].find_one({"clerk_id": clerk_user_id})
 
+            request.clerk_user_id = clerk_user_id
             request.clerk_user = user
 
         except Exception as e:
             print(f"Unexpected Auth error: {e}")
-            return jsonify({"error": "Authentication processing failed"}), 500
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": "Authentication processing failed", "details": str(e)}), 500
 
         return f(*args, **kwargs)
 
     return decorated
+
 
 def get_current_user():
     """

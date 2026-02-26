@@ -5,7 +5,7 @@ from clerk_backend_api import Clerk
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from config.db import mongodb_connection, check_mongodb_connection
-from models.user import UserUpdate
+from models.user_model import UserUpdate
 from services.clerk_auth import ClerkAuthService
 from flask import Blueprint, jsonify, current_app
 load_dotenv("key.env")

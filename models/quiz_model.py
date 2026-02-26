@@ -9,15 +9,18 @@ class DuelStatus(str, Enum):
     FINISHED = "finished"
 
 class QuestionModel(BaseModel):
-    id: int = Field(..., description="ID ")
+    id: Optional[int] = Field(None, description="ID (optionnel, auto-généré par MongoDB)")
     text: str = Field(..., description=" La question")
     options: List[str] = Field(..., description="Liste des choix possibles")
     correct_answer: str = Field(..., description="La réponse correcte")
     points: int = Field(10, description="Points gagnés")
     category: str = Field(..., description="Catégorie de la question")
+    
+    class Config:
+        extra = "forbid"  # Empêche l'ajout de champs non définis
 
 class QuizModel(BaseModel):
-    id: int = Field(..., description="ID unique du quiz")
+    id: Optional[int] = Field(None, description="ID unique du quiz (optionnel, généré par MongoDB)")
     title: str = Field(..., description="Titre du quiz")
     category: str = Field(..., description="Catégorie")
     difficulty: str = Field("medium", description="Niveau de difficulté")
@@ -44,3 +47,4 @@ class DuelModel(BaseModel):
     scores: Dict[str, int] = Field(default_factory=dict)
     winner_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+

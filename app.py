@@ -14,14 +14,13 @@ load_dotenv("key.env")
 
 app = Flask(__name__)
 
-# Configure CORS to allow credentials (cookies) from frontend
+# Configure CORS to allow credentials from frontend for all routes
 CORS(app, supports_credentials=True, resources={
-    r"/auth/*": {
-        "origins": os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    r"/*": {
+        "origins": os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
     }
 })
 
-clerk_auth_service = ClerkAuthService()
 app.register_blueprint(auth_bp)
 app.register_blueprint(quiz_bp)
 
@@ -52,6 +51,6 @@ def check_mongodb():
         return jsonify({"connected": False, "error": message}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
 
