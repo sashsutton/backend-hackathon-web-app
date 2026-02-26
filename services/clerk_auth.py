@@ -19,6 +19,7 @@ class ClerkAuthService:
         self.secret_key = os.getenv("CLERK_SECRET_KEY")
         if not self.secret_key:
             raise ValueError("CLERK_SECRET_KEY environment variable not set")
+<<<<<<< HEAD
     def verify_clerk_session(self, httpx_request: httpx.Request):
         sdk = Clerk(bearer_auth=os.getenv('CLERK_SECRET_KEY'))
     
@@ -28,6 +29,11 @@ class ClerkAuthService:
     )
     
         return request_state
+=======
+
+
+
+>>>>>>> d15abcb3ad0fff9dc217463381d8ce3be5a76272
     def get_clerk_client(self):
         return Clerk(bearer_auth=self.secret_key)
     

@@ -7,12 +7,8 @@ from datetime import datetime
 from config.db import mongodb_connection
 from pymongo.errors import PyMongoError
 from models.user import UserBase, UserUpdate
-
-import os
 import httpx
-from clerk_backend_api import Clerk
-from clerk_backend_api.security import authenticate_request
-from clerk_backend_api.security.types import AuthenticateRequestOptions
+
 auth_bp = Blueprint('auth', __name__)
 
 clerk_auth_service = ClerkAuthService()
@@ -115,20 +111,33 @@ def signup():
             "success": False,
             "error": f"Registration failed: {str(e)}"
         }), 500
+<<<<<<< HEAD
         
         
+=======
+>>>>>>> d15abcb3ad0fff9dc217463381d8ce3be5a76272
 
 @auth_bp.route('/auth/me', methods=['GET'])
 def get_my_info():
+    """
+    Get current authenticated user information.
+    Uses Clerk's authenticate_request to verify the session.
+    """
     try:
+<<<<<<< HEAD
         
         clerk_req = httpx.Request(
+=======
+        # Convert Flask request to httpx.Request for Clerk authentication
+        my_clerk_request = httpx.Request(
+>>>>>>> d15abcb3ad0fff9dc217463381d8ce3be5a76272
             method=request.method,
             url=request.url,
             headers=dict(request.headers),
             content=request.get_data()
         )
 
+<<<<<<< HEAD
         state = clerk_auth_service.verify_clerk_session(clerk_req)
 
         if not state.is_signed_in:
@@ -145,10 +154,34 @@ def get_my_info():
             "message": "Infos récupérées du Payload",
             "user_id": user_info.get("sub"), 
             "details_du_front": user_info
+=======
+        # Authenticate the request using Clerk's backend SDK
+        request_state = clerk_auth_service.is_signed_in(my_clerk_request)
+
+        # Check if user is signed in
+        if not request_state.is_signed_in:
+            return jsonify({
+                "success": False,
+                "error": "Invalid session",
+                "reason": request_state.reason
+            }), 401
+
+        # Return user information from the authenticated payload
+        return jsonify({
+            "success": True,
+            "clerk_id": request_state.payload.get("sub"),
+            "email": request_state.payload.get("email", ""),
+            "first_name": request_state.payload.get("first_name", ""),
+            "last_name": request_state.payload.get("last_name", ""),
+            "full_payload": request_state.payload
+>>>>>>> d15abcb3ad0fff9dc217463381d8ce3be5a76272
         }), 200
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({
+            "success": False,
+            "error": f"Authentication check failed: {str(e)}"
+        }), 500
 @auth_bp.route('/auth/login', methods=['POST'])
 def login():
 
