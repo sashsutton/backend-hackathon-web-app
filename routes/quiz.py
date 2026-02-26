@@ -1,66 +1,90 @@
 
-import os
-import uuid
-from flask import Blueprint, request, jsonify
-from models.quiz_models import BattleModel, BattleStatus
-from services.clerk_auth import ClerkAuthService
-from datetime import datetime
-from config.db import mongodb_connection
-from pymongo.errors import PyMongoError
-from models.user import UserBase, UserUpdate
-
-import os
 import httpx
-from clerk_backend_api import Clerk
-from clerk_backend_api.security import authenticate_request
-from clerk_backend_api.security.types import AuthenticateRequestOptions
+from flask import Blueprint, request, jsonify
+from pydantic import ValidationError
+from models.quiz_models import QuizResult, UserAnswerModel
+from services.quiz_service import QuizService
+from config.db import mongodb_connection
+from middleware.clerk_auth import clerk_auth_middleware, get_current_user
 quiz_bp = Blueprint('quiz', __name__)
-db = mongodb_connection().get_database("hackathon_db")
+
+@quiz_bp.route('/quiz/get-all-quizzes', methods=['GET'])
+@clerk_auth_middleware
 def get_all_quizzes():
-    quizzes = list(db.quizzes.find({}, {"_id": 1, "title": 1, "category": 1}))
-    for q in quizzes: q['_id'] = str(q['_id'])
+    mongo_client = mongodb_connection()
+    db = mongo_client.get_database("hackathon_db")
+    quiz_service = QuizService(db)
+    quizzes = quiz_service.get_all_quizzes()
     return jsonify(quizzes), 200
 @quiz_bp.route('/quizzes/<quiz_id>', methods=['GET'])
+@clerk_auth_middleware
 def get_quiz_by_id(quiz_id):
-    quiz_data = db.quizzes.find_one({"id": quiz_id}, {"_id": 0})
-    if not quiz_data:
-        return jsonify({"success": False, "error": "Quiz introuvable"}), 404
+    mongo_client = mongodb_connection()
+    db = mongo_client.get_database("hackathon_db")
+    try:
+        quiz_service = QuizService(db)
+        quiz_data = quiz_service.get_quiz_by_id(quiz_id)
+        return jsonify({"success": True, "quiz": quiz_data}), 200
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": "Une erreur est survenue"}), 500
+
+@quiz_bp.route('/quiz/create-quiz', methods=['POST'])
+@clerk_auth_middleware
+def create_quiz():
+    try:
+        data = request.get_json()
+        
+
+        user_answers = [UserAnswerModel(**answer) for answer in data.get('answers', [])]
+        
+
+        quiz_result_data = {
+            'clerk_id': data.get('clerk_id'),
+            'quiz_id': data.get('quiz_id'),
+            'score': 0,
+            'answers': user_answers
+        }
+        quiz_result = QuizResult(**quiz_result_data)
+        
+    except ValidationError as e:
+        return jsonify({
+            "success": False,
+            "error": "Validation failed",
+            "details": e.errors()
+        }), 400
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Missing required field: {str(e)}"
+        }), 400
+
+    mongo_client = mongodb_connection()
+    db = mongo_client.get_database("hackathon_db")
+
+
+    current_user = get_current_user()
+    if current_user:
+        clerk_id = current_user.get('id') or quiz_result.clerk_id
+    else:
+        clerk_id = quiz_result.clerk_id
+    quiz_id = quiz_result.quiz_id
+    user_answers = quiz_result.answers
     
-    for q in quiz_data['questions']:
-        del q['correct_answer']
-        
-    return jsonify({"success": True, "quiz": quiz_data}), 200
 
-@quiz_bp.route('/quizzes/submit', methods=['POST'])
-def submit_quiz():
-    data = request.get_json()
-    clerk_id = data.get('clerk_id')
-    quiz_id = data.get('quiz_id')
-    user_answers = data.get('answers') 
-    original_quiz = db.quizzes.find_one({"id": quiz_id})
-    if not original_quiz:
-        return jsonify({"success": False, "error": "Quiz non trouvé"}), 404
-    total_score = 0
-    detailed_answers = []
-    for user_ans in user_answers:
-        question = next((q for q in original_quiz['questions'] if q['id'] == user_ans['question_id']), None)
-        
-        if question:
-            is_correct = (user_ans['selected_option'] == question['correct_answer'])
-            if is_correct:
-                total_score += question['points']
-            
-            detailed_answers.append({
-                "question_id": question['id'],
-                "selected_option": user_ans['selected_option'],
-                "is_correct": is_correct
-            })
-    result_data = {
-        "clerk_id": clerk_id,
-        "quiz_id": quiz_id,
-        "score": total_score,
-        "answers": detailed_answers
-    }
-    db.results.insert_one(result_data)
+    quiz_service = QuizService(db)
+    
 
-    return jsonify({"success": True, "score": total_score, "details": detailed_answers}), 200
+    quiz_result_with_score = quiz_service.calculate_quiz_score(quiz_id, user_answers)
+    quiz_result_with_score.clerk_id = clerk_id
+    
+
+    result_id = quiz_service.save_quiz_result(quiz_result_with_score)
+
+    return jsonify({
+        "success": True, 
+        "score": quiz_result_with_score.score, 
+        "details": quiz_result_with_score.answers,
+        "result_id": result_id
+    }), 200

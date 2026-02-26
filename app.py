@@ -8,6 +8,7 @@ from services.clerk_auth import ClerkAuthService
 
 # Import blueprints
 from routes.auth import auth_bp
+from routes.quiz import quiz_bp
 
 load_dotenv("key.env")
 
@@ -22,6 +23,7 @@ CORS(app, supports_credentials=True, resources={
 
 clerk_auth_service = ClerkAuthService()
 app.register_blueprint(auth_bp)
+app.register_blueprint(quiz_bp)
 
 @app.route('/')
 def hello_world():

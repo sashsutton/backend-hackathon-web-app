@@ -3,21 +3,21 @@ from typing import Optional, List, Dict
 from enum import Enum
 from datetime import datetime
 
-class BattleStatus(str, Enum):
+class DuelStatus(str, Enum):
     WAITING = "waiting"
     INBATTLE = "in_battle"
     FINISHED = "finished"
 
 class QuestionModel(BaseModel):
-    id: str = Field(..., description="ID ")
-    text: str = Field(..., description=" la question")
+    id: int = Field(..., description="ID ")
+    text: str = Field(..., description=" La question")
     options: List[str] = Field(..., description="Liste des choix possibles")
     correct_answer: str = Field(..., description="La réponse correcte")
     points: int = Field(10, description="Points gagnés")
     category: str = Field(..., description="Catégorie de la question")
 
 class QuizModel(BaseModel):
-    id: str = Field(..., description="ID unique du quiz")
+    id: int = Field(..., description="ID unique du quiz")
     title: str = Field(..., description="Titre du quiz")
     category: str = Field(..., description="Catégorie")
     difficulty: str = Field("medium", description="Niveau de difficulté")
@@ -35,12 +35,12 @@ class QuizResult(BaseModel):
     score: int
     answers: List[UserAnswerModel] = Field(default_factory=list)
 
-class BattleModel(BaseModel):
+class DuelModel(BaseModel):
     id: str = Field(..., description="ID unique de la Battle") 
     quiz_id: str
     player1_id: str = Field(..., description="ID du créateur")
     player2_id: Optional[str] = Field(None, description="ID de l'adversaire")
-    status: BattleStatus = Field(default=BattleStatus.WAITING)
+    status: DuelStatus = Field(default=DuelStatus.WAITING)
     scores: Dict[str, int] = Field(default_factory=dict)
     winner_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
