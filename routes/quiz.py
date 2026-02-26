@@ -115,12 +115,12 @@ def create_quiz():
         data = request.get_json()
 
         if 'questions' in data:
-            # This is a quiz creation request
+
             mongo_client = mongodb_connection()
             db = mongo_client.get_database("hackathon_db")
             quiz_service = QuizService(db)
             
-            # Use the service to create the quiz
+
             quiz_id = quiz_service.create_quiz(data)
             
             return jsonify({
