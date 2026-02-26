@@ -60,13 +60,9 @@ class QuizService:
     
     def get_all_quizzes(self) -> List[Dict[str, Any]]:
         """
-        Get all quizzes with basic information.
-        
-        Returns:
-            List of quizzes with id, title, and category
+        Get all quizzes with all metadata (excluding the full questions array for performance).
         """
-        quizzes = list(self.db.quizzes.find({}, {"_id": 1, "title": 1, "category": 1}))
-        # Convert ObjectId to string
+        quizzes = list(self.db.quizzes.find({}, {"questions": 0}))
         for q in quizzes:
             q['_id'] = str(q['_id'])
         return quizzes

@@ -16,9 +16,35 @@ def get_all_quizzes():
     mongo_client = mongodb_connection()
     db = mongo_client.get_database("hackathon_db")
     quiz_service = QuizService(db)
+
     quizzes = quiz_service.get_all_quizzes()
     return jsonify(quizzes), 200
-@quiz_bp.route('/quizzes/<quiz_id>', methods=['GET'])
+
+
+@quiz_bp.route('/quiz/page/<quiz_id>', methods=['GET'])
+@clerk_auth_middleware
+def get_page_quiz_by_id(quiz_id):
+
+
+    mongo_client = mongodb_connection()
+    db = mongo_client.get_database("hackathon_db")
+
+    try:
+
+        quiz_data = db.quizzes.find_one({"id": quiz_id})
+
+        if not quiz_data:
+            return jsonify({"success": False, "message": "Quiz not found"}), 404
+
+        quiz_data['_id'] = str(quiz_data['_id'])
+
+        return jsonify({"success": True, "quiz": quiz_data}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@quiz_bp.route('/quiz/<quiz_id>', methods=['GET'])
 @clerk_auth_middleware
 def get_quiz_by_id(quiz_id):
     mongo_client = mongodb_connection()
