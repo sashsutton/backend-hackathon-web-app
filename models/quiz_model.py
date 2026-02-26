@@ -51,12 +51,15 @@ class QuizResult(BaseModel):
     answers: List[UserAnswerModel] = Field(default_factory=list)
 
 class DuelModel(BaseModel):
-    id: str = Field(..., description="ID unique de la Battle") 
+    id: Optional[str] = Field(None, alias="_id")
+    room_code: str = Field(..., description="6-char room code for joining")
     quiz_id: str
     player1_id: str = Field(..., description="ID du créateur")
     player2_id: Optional[str] = Field(None, description="ID de l'adversaire")
     status: DuelStatus = Field(default=DuelStatus.WAITING)
-    scores: Dict[str, int] = Field(default_factory=dict)
+    player1_score: int = Field(0)
+    player2_score: int = Field(0)
+    player1_done: bool = Field(False)
+    player2_done: bool = Field(False)
     winner_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
-

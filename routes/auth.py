@@ -65,40 +65,25 @@ def update_profile():
 
         update_data = request.get_json()
 
-
-        from models.user_model import UserUpdate
-        validated_update = UserUpdate(**update_data)
-
-
         update_fields = {}
-        if validated_update.name:
-            # Split name into first and last name
-            name_parts = validated_update.name.split(' ', 1)
-            update_fields['first_name'] = name_parts[0]
-            if len(name_parts) > 1:
-                update_fields['last_name'] = name_parts[1]
-        if validated_update.promotion:
-            update_fields['promotion'] = validated_update.promotion
-        if validated_update.mention:
-            update_fields['mention'] = validated_update.mention
-        if validated_update.email:
-            update_fields['email'] = validated_update.email
+        allowed = ['first_name', 'last_name', 'promotion', 'mention', 'email']
+        for field in allowed:
+            if field in update_data and update_data[field]:
+                update_fields[field] = update_data[field]
+
+        if not update_fields:
+            return jsonify({"success": False, "error": "No valid fields to update"}), 400
 
         # Update the user in MongoDB
         db = mongodb_connection().get_database("hackathon_db")
+        current_user = request.clerk_user
         result = db["users"].update_one(
             {"clerk_id": current_user.get("clerk_id")},
             {"$set": update_fields}
         )
 
-        if result.modified_count == 0:
-            return jsonify({
-                "success": False,
-                "error": "No changes made or user not found"
-            }), 404
-
-
         updated_user = db["users"].find_one({"clerk_id": current_user.get("clerk_id")})
+
 
         return jsonify({
             "success": True,
@@ -121,3 +106,27 @@ def update_profile():
             "success": False,
             "error": f"Failed to update profile: {str(e)}"
         }), 500
+
+
+@auth_bp.route('/leaderboard', methods=['GET'])
+@clerk_auth_middleware
+def get_leaderboard():
+    try:
+        db = mongodb_connection().get_database("hackathon_db")
+        users = list(db["users"].find({}, {
+            "_id": 0,
+            "clerk_id": 1,
+            "first_name": 1,
+            "last_name": 1,
+            "promotion": 1,
+            "mention": 1,
+            "elo": 1,
+            "wins": 1,
+            "losses": 1,
+            "total_duels": 1
+        }).sort("elo", -1).limit(50))
+
+        return jsonify({"success": True, "leaderboard": users}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
