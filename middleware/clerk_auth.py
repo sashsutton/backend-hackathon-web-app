@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from clerk_backend_api import Clerk
 from clerk_backend_api.security.types import AuthenticateRequestOptions
 from config.db import mongodb_connection
+from models.user import UserBase
 
 load_dotenv("key.env")
 
@@ -67,19 +68,42 @@ def clerk_auth_middleware(f):
                     last_name = ""
                     email = ""
 
-                user = {
+
+                user_data = {
                     "clerk_id": clerk_user_id,
                     "first_name": first_name,
                     "last_name": last_name,
                     "email": email,
+                    "promotion": "Unknown",
+                    "mention": "Unknown",
                     "elo_rating": 1200,
                     "total_duels": 0,
                     "wins": 0,
                     "losses": 0
                 }
 
+                try:
+                    validated_user = UserBase(**user_data)
+                    user_dict = validated_user.model_dump()
+                    
 
-                mongo_client.users.insert_one(user)
+                    user_dict["elo"] = user_dict.pop("elo_rating")
+                    
+                    mongo_client.users.insert_one(user_dict)
+                except Exception as e:
+                    print(f"Pydantic validation error: {e}")
+
+                    user_dict = {
+                        "clerk_id": clerk_user_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "elo": 1200,
+                        "total_duels": 0,
+                        "wins": 0,
+                        "losses": 0
+                    }
+                    mongo_client.users.insert_one(user_dict)
                 print(f"Successfully created DB profile for {first_name} {last_name}")
 
 
