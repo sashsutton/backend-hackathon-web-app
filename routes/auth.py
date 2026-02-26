@@ -117,40 +117,34 @@ def signup():
         }), 500
         
         
-@auth_bp.route('/auth/me', methods=['GET'])
-def is_signed_in(request: httpx.Request):
-    sdk = Clerk(bearer_auth=os.getenv('CLERK_SECRET_KEY'))
-    request_state = sdk.authenticate_request(
-        request,
-        AuthenticateRequestOptions(
-            authorized_parties=['https://example.com']
-        )
-    )
-    return request_state.is_signed_in
+
 @auth_bp.route('/auth/me', methods=['GET'])
 def get_my_info():
     try:
         
-        my_clerk_request = httpx.Request(
+        clerk_req = httpx.Request(
             method=request.method,
             url=request.url,
             headers=dict(request.headers),
             content=request.get_data()
         )
 
-        request_state = clerk_auth_service.is_signed_in(my_clerk_request)
+        state = clerk_auth_service.verify_clerk_session(clerk_req)
 
-        if not request_state.is_signed_in:
+        if not state.is_signed_in:
             return jsonify({
-                "success": False,
-                "error": "Session invalide",
-                "reason": request_state.reason
+                "success": False, 
+                "error": "Non connecté", 
+                "reason": str(state.reason)
             }), 401
+
+        user_info = state.payload 
 
         return jsonify({
             "success": True,
-            "clerk_id": request_state.payload.get("sub"),
-            "user_data": request_state.payload
+            "message": "Infos récupérées du Payload",
+            "user_id": user_info.get("sub"), 
+            "details_du_front": user_info
         }), 200
 
     except Exception as e:
