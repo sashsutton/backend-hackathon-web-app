@@ -24,14 +24,22 @@ def get_all_quizzes():
 @quiz_bp.route('/quiz/page/<quiz_id>', methods=['GET'])
 @clerk_auth_middleware
 def get_page_quiz_by_id(quiz_id):
-
+    from bson import ObjectId
 
     mongo_client = mongodb_connection()
     db = mongo_client.get_database("hackathon_db")
 
     try:
+        # Try to find by MongoDB ObjectId first (sent from frontend as quiz._id)
+        quiz_data = None
+        try:
+            quiz_data = db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+        except Exception:
+            pass
 
-        quiz_data = db.quizzes.find_one({"id": quiz_id})
+        # Fallback: try by custom string id field
+        if not quiz_data:
+            quiz_data = db.quizzes.find_one({"id": quiz_id})
 
         if not quiz_data:
             return jsonify({"success": False, "message": "Quiz not found"}), 404
