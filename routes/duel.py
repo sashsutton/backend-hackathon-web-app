@@ -5,6 +5,8 @@ from middleware.clerk_auth import clerk_auth_middleware, get_current_user
 from config.db import mongodb_connection
 from bson import ObjectId
 from datetime import datetime
+from models.quiz_model import UserAnswerModel
+from services.quiz_service import QuizService
 
 duel_bp = Blueprint('duel', __name__)
 
@@ -14,11 +16,41 @@ def generate_room_code():
 def get_db():
     return mongodb_connection().get_database("hackathon_db")
 
+
+@duel_bp.route('/duel/<duel_id>/debug', methods=['GET'])
+def debug_duel_quiz(duel_id):
+    """Show raw quiz data for a duel — for diagnosing correct_answer format."""
+    db = get_db()
+    try:
+        duel = db.duels.find_one({"_id": ObjectId(duel_id)})
+        if not duel:
+            return jsonify({"error": "Duel not found"}), 404
+        quiz = db.quizzes.find_one({"_id": ObjectId(duel['quiz_id'])})
+        if not quiz:
+            return jsonify({"error": "Quiz not found"}), 404
+        return jsonify({
+            "quiz_title": quiz.get('title'),
+            "duel_status": duel.get('status'),
+            "player1_score": duel.get('player1_score'),
+            "player2_score": duel.get('player2_score'),
+            "questions": [{
+                "index": i,
+                "text": q.get('text', '')[:60],
+                "options": q.get('options', []),
+                "correct_answer": q.get('correct_answer'),
+                "correct_answer_type": type(q.get('correct_answer')).__name__,
+                "id_field": q.get('id'),
+                "points": q.get('points'),
+            } for i, q in enumerate(quiz.get('questions', []))]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 def serialize_duel(duel):
     duel['_id'] = str(duel['_id'])
     return duel
 
-# ─── Create duel ────────────────────────────────────────────────────────────
+
 
 @duel_bp.route('/duel/create', methods=['POST'])
 @clerk_auth_middleware
@@ -34,7 +66,7 @@ def create_duel():
 
         db = get_db()
 
-        # Verify quiz exists
+
         try:
             quiz = db.quizzes.find_one({"_id": ObjectId(quiz_id)})
         except Exception:
@@ -74,7 +106,7 @@ def create_duel():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ─── Join duel ───────────────────────────────────────────────────────────────
+
 
 @duel_bp.route('/duel/join/<room_code>', methods=['POST'])
 @clerk_auth_middleware
@@ -109,7 +141,7 @@ def join_duel(room_code):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ─── Get duel status ─────────────────────────────────────────────────────────
+
 
 @duel_bp.route('/duel/<duel_id>', methods=['GET'])
 @clerk_auth_middleware
@@ -152,7 +184,7 @@ def get_duel(duel_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ─── Submit duel answers ─────────────────────────────────────────────────────
+
 
 @duel_bp.route('/duel/<duel_id>/submit', methods=['POST'])
 @clerk_auth_middleware
@@ -175,22 +207,12 @@ def submit_duel(duel_id):
         if not is_player1 and not is_player2:
             return jsonify({"success": False, "error": "You are not part of this duel"}), 403
 
-        # Calculate score
-        quiz = db.quizzes.find_one({"_id": ObjectId(duel['quiz_id'])})
-        if not quiz:
-            return jsonify({"success": False, "error": "Quiz not found"}), 404
 
-        questions = quiz.get('questions', [])
-        total_score = 0
-        for ans in answers:
-            q_id = str(ans.get('question_id'))
-            selected = str(ans.get('selected_option', ''))
-            for idx, q in enumerate(questions):
-                db_q_id = str(q.get('id')) if q.get('id') is not None else str(idx)
-                if db_q_id == q_id:
-                    if selected == str(q.get('correct_answer', '')):
-                        total_score += int(q.get('points', 10))
-                    break
+        quiz_service = QuizService(db)
+        user_answers = [UserAnswerModel(**ans) for ans in answers]
+        quiz_result = quiz_service.calculate_quiz_score(duel['quiz_id'], user_answers)
+        total_score = quiz_result.score
+        print(f"[DUEL SCORE] player={'p1' if is_player1 else 'p2'} score={total_score}")
 
         # Update the duel
         score_field = 'player1_score' if is_player1 else 'player2_score'
@@ -199,7 +221,7 @@ def submit_duel(duel_id):
         update = {"$set": {score_field: total_score, done_field: True}}
         db.duels.update_one({"_id": ObjectId(duel_id)}, update)
 
-        # Refresh duel
+
         duel = db.duels.find_one({"_id": ObjectId(duel_id)})
         both_done = duel.get('player1_done') and duel.get('player2_done')
 
@@ -257,7 +279,7 @@ def submit_duel(duel_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ─── My duels history ────────────────────────────────────────────────────────
+
 
 @duel_bp.route('/duel/my-duels', methods=['GET'])
 @clerk_auth_middleware
