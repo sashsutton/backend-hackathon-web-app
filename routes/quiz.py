@@ -71,34 +71,19 @@ def get_quiz_by_id(quiz_id):
 def create_question():
     try:
         data = request.get_json()
-        print(f"Requête reçue pour créer une question : {data}")  # Log pour déboguer
-        
         mongo_client = mongodb_connection()
         db = mongo_client.get_database("hackathon_db")
         quiz_service = QuizService(db)
-
         question_id = quiz_service.create_question(data)
-        print(f"Question créée avec succès. ID : {question_id}")  # Log pour déboguer
-        
         return jsonify({
             "success": True,
             "question_id": question_id,
             "message": "Question created successfully"
         }), 201
-        
     except ValidationError as e:
-        print(f"Erreur de validation : {e.errors()}")  # Log pour déboguer
-        return jsonify({
-            "success": False,
-            "error": "Validation failed",
-            "details": e.errors()
-        }), 400
+        return jsonify({"success": False, "error": "Validation failed", "details": e.errors()}), 400
     except Exception as e:
-        print(f"Erreur lors de la création de la question : {str(e)}")  # Log pour déboguer
-        return jsonify({
-            "success": False,
-            "error": f"Failed to create question: {str(e)}"
-        }), 500
+        return jsonify({"success": False, "error": f"Failed to create question: {str(e)}"}), 500
 
 @quiz_bp.route('/quiz/get-all-questions', methods=['GET'])
 @clerk_auth_middleware
@@ -259,19 +244,36 @@ def start_solo_quiz(quiz_id):
         db = mongo_client.get_database("hackathon_db")
         quiz_service = QuizService(db)
 
-        session_id = quiz_service.create_solo_session(quiz_id, clerk_id)
+        # Check existing session for this user+quiz
+        session_check = quiz_service.check_solo_session(quiz_id, clerk_id)
 
+        if session_check['status'] == 'finished':
+            return jsonify({
+                "success": False,
+                "status": "finished",
+                "error": "Vous avez déjà complété ce quiz."
+            }), 409
+
+        if session_check['status'] == 'in_progress':
+            return jsonify({
+                "success": True,
+                "status": "in_progress",
+                "session_id": session_check['session_id'],
+                "message": "Session en cours récupérée."
+            }), 200
+
+        # Create a fresh session
+        session_id = quiz_service.create_solo_session(quiz_id, clerk_id)
         return jsonify({
             "success": True,
+            "status": "new",
             "session_id": session_id,
-            "message": "Solo session created successfully"
+            "message": "Session solo créée."
         }), 201
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to create solo session: {str(e)}"
-        }), 500
+        return jsonify({"success": False, "error": f"Failed to create solo session: {str(e)}"}), 500
+
 
 @quiz_bp.route('/quiz/submit-solo', methods=['POST'])
 @clerk_auth_middleware
@@ -289,37 +291,27 @@ def submit_solo_quiz():
         current_user = get_current_user()
         clerk_id = current_user.get('clerk_id')
 
-        # The frontend will not know is_correct yet, so if missing/ignored, it recalculates
-        # However, UserAnswerModel requires is_correct. The frontend should just pass a default like false.
         user_answers = [UserAnswerModel(**ans) for ans in answers]
+        quiz_result = quiz_service.calculate_quiz_score(quiz_id, user_answers)
+        quiz_result.clerk_id = clerk_id
 
-        quiz_result_with_score = quiz_service.calculate_quiz_score(quiz_id, user_answers)
-        quiz_result_with_score.clerk_id = clerk_id
-
-        result_id = quiz_service.save_quiz_result(quiz_result_with_score)
+        result_id = quiz_service.save_quiz_result(quiz_result)
 
         if session_id:
             from bson import ObjectId
             db.solo_sessions.update_one(
                 {"_id": ObjectId(session_id)},
-                {"$set": {"status": "finished", "score": quiz_result_with_score.score}}
+                {"$set": {"status": "finished", "score": quiz_result.score}}
             )
 
         return jsonify({
-            "success": True, 
-            "score": quiz_result_with_score.score, 
-            "details": [a.model_dump() if hasattr(a, 'model_dump') else a for a in quiz_result_with_score.answers],
+            "success": True,
+            "score": quiz_result.score,
+            "details": [a.model_dump() if hasattr(a, 'model_dump') else a for a in quiz_result.answers],
             "result_id": result_id
         }), 200
 
     except ValidationError as e:
-        return jsonify({
-            "success": False,
-            "error": "Validation failed",
-            "details": e.errors()
-        }), 400
+        return jsonify({"success": False, "error": "Validation failed", "details": e.errors()}), 400
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to submit solo quiz: {str(e)}"
-        }), 500
+        return jsonify({"success": False, "error": f"Failed to submit solo quiz: {str(e)}"}), 500

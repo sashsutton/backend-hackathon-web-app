@@ -87,19 +87,25 @@ def join_duel(room_code):
         duel = db.duels.find_one({"room_code": room_code.upper(), "status": "waiting"})
 
         if not duel:
-            return jsonify({"success": False, "error": "Duel not found or already started"}), 404
+            return jsonify({"success": False, "error": "Duel introuvable ou déjà commencé"}), 404
 
         if duel['player1_id'] == clerk_id:
-            return jsonify({"success": False, "error": "You cannot join your own duel"}), 400
+            return jsonify({"success": False, "error": "Vous ne pouvez pas rejoindre votre propre duel"}), 400
+
+        duel_id = str(duel['_id'])
 
         db.duels.update_one(
             {"_id": duel['_id']},
             {"$set": {"player2_id": clerk_id, "status": "in_battle"}}
         )
 
+        # Notify Player 1's socket via server-side emit — no client socket needed
+        from extensions import socketio
+        socketio.emit('duel:started', {"duel_id": duel_id}, to=duel_id)
+
         return jsonify({
             "success": True,
-            "duel_id": str(duel['_id']),
+            "duel_id": duel_id,
             "quiz_id": duel['quiz_id']
         }), 200
 

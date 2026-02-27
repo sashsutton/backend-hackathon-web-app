@@ -10,7 +10,7 @@ class QuizService:
     
     def calculate_quiz_score(self, quiz_id: str, user_answers: List[UserAnswerModel]) -> QuizResult:
         from bson import ObjectId
-        
+
         original_quiz = None
         try:
             original_quiz = self.db.quizzes.find_one({"_id": ObjectId(quiz_id)})
@@ -22,13 +22,10 @@ class QuizService:
 
         if not original_quiz:
             raise ValueError("Quiz not found")
-        
+
         total_score = 0
         detailed_answers = []
-        
         questions = original_quiz.get('questions', [])
-        print(f"[DEBUG] Quiz {quiz_id}: {len(questions)} questions found")
-        print(f"[DEBUG] User answers: {[(str(a.question_id), a.selected_option) for a in user_answers]}")
 
         for user_ans in user_answers:
             question = None
@@ -37,20 +34,17 @@ class QuizService:
                 if q_id == str(user_ans.question_id):
                     question = q
                     break
-            
-            print(f"[DEBUG] Answer for q_id={user_ans.question_id}: question_found={question is not None}, selected={user_ans.selected_option}")
-            
+
             if question:
                 is_correct = (str(user_ans.selected_option) == str(question.get('correct_answer')))
                 if is_correct:
                     total_score += int(question.get('points', 10))
-                
                 detailed_answers.append({
                     "question_id": str(user_ans.question_id),
                     "selected_option": user_ans.selected_option,
                     "is_correct": is_correct
                 })
-        
+
         return QuizResult(
             clerk_id="",
             quiz_id=quiz_id,
@@ -137,13 +131,32 @@ class QuizService:
             raise ValueError("Question not found")
         return question
 
+    def check_solo_session(self, quiz_id: str, clerk_id: str) -> dict:
+        """
+        Returns the user's session state for a given quiz:
+          - status: 'finished' | 'in_progress' | 'none'
+          - session_id: str | None
+        """
+        # Check for a finished session first
+        finished = self.db.solo_sessions.find_one(
+            {"quiz_id": quiz_id, "clerk_id": clerk_id, "status": "finished"}
+        )
+        if finished:
+            return {"status": "finished", "session_id": None}
+
+        # Check for an in-progress session
+        in_progress = self.db.solo_sessions.find_one(
+            {"quiz_id": quiz_id, "clerk_id": clerk_id, "status": "in_progress"}
+        )
+        if in_progress:
+            return {"status": "in_progress", "session_id": str(in_progress['_id'])}
+
+        return {"status": "none", "session_id": None}
+
     def create_solo_session(self, quiz_id: str, clerk_id: str) -> str:
         from models.quiz_model import SoloGameSessionModel
-        
-        session = SoloGameSessionModel(
-            quiz_id=quiz_id,
-            clerk_id=clerk_id
-        )
+
+        session = SoloGameSessionModel(quiz_id=quiz_id, clerk_id=clerk_id)
         session_dict = session.model_dump(exclude={'id'})
         result = self.db.solo_sessions.insert_one(session_dict)
         return str(result.inserted_id)
