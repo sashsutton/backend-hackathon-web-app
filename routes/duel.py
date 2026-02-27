@@ -99,10 +99,6 @@ def join_duel(room_code):
             {"$set": {"player2_id": clerk_id, "status": "in_battle"}}
         )
 
-        # Notify Player 1's socket via server-side emit — no client socket needed
-        from extensions import socketio
-        socketio.emit('duel:started', {"duel_id": duel_id}, to=duel_id)
-
         return jsonify({
             "success": True,
             "duel_id": duel_id,
