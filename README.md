@@ -3,6 +3,8 @@
 ## Overview
 This backend supports a quiz application designed to strengthen cohesion among computer science students at Aix-Marseille University. The app facilitates quiz-based interactions between undergraduate and graduate students.
 
+**Frontend Repository**: [frontend-hackathon-quizz-app](https://github.com/sashsutton/frontend-hackathon-quizz-app)
+
 ## Features
 - User authentication via Clerk
 - Quiz creation and management
