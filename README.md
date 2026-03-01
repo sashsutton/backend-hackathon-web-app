@@ -10,7 +10,6 @@ This backend supports a quiz application designed to strengthen cohesion among c
 - Quiz creation and management
 - Duel mode for competitive quizzing
 - Session-based interactions
-- -
 
 ## Setup
 
